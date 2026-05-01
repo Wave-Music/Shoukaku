@@ -93,6 +93,7 @@ export interface VoiceChannelOptions {
 	channelId: string;
 	deaf?: boolean;
 	mute?: boolean;
+	node?: Node;
 }
 
 // Interfaces are not final, but types are, and therefore has an index signature
@@ -239,6 +240,7 @@ export class Shoukaku extends TypedEventEmitter<ShoukakuEvents> {
      * @param options.channelId ChannelId of the voice channel you want to connect to
      * @param options.deaf Optional boolean value to specify whether to deafen or undeafen the current bot user
      * @param options.mute Optional boolean value to specify whether to mute or unmute the current bot user
+	 * @param options.node Optional node to use for this connection
      * @returns The created player
      */
 	public async joinVoiceChannel(options: VoiceChannelOptions): Promise<Player> {
@@ -253,7 +255,7 @@ export class Shoukaku extends TypedEventEmitter<ShoukakuEvents> {
 			throw error;
 		}
 		try {
-			const node = this.getIdealNode(connection);
+			const node = options.node ?? this.getIdealNode(connection);
 			if (!node)
 				throw new Error('Can\'t find any nodes to connect on');
 			const player = this.options.structures.player ? new this.options.structures.player(connection.guildId, node) : new Player(connection.guildId, node);

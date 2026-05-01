@@ -1,4 +1,4 @@
-import { Versions } from '../Constants';
+import { State, Versions } from '../Constants';
 import type { FilterOptions } from '../guild/Player';
 import type { NodeOption } from '../Shoukaku';
 import type { Node, NodeInfo, Stats } from './Node';
@@ -28,7 +28,18 @@ export interface Track {
 		isrc?: string;
 		sourceName: string;
 	};
-	pluginInfo: unknown;
+	pluginInfo: {
+		[key: string]: unknown;
+		albumName?: string;
+		albumUrl?: string;
+		albumArtUrl?: string;
+		artistUrl?: string;
+		artistArtworkUrl?: string;
+		previewUrl?: string;
+		isPreview?: boolean;
+		genres?: string[];
+		playlistName?: string;
+	};
 }
 
 export interface Playlist {
@@ -37,7 +48,14 @@ export interface Playlist {
 		name: string;
 		selectedTrack: number;
 	};
-	pluginInfo: unknown;
+	pluginInfo: {
+		[key: string]: unknown;
+		type: 'album' | 'playlist' | 'artist' | 'recommendations';
+		url?: string;
+		artworkUrl?: string;
+		author?: string;
+		totalTracks?: number;
+	};
 	tracks: Track[];
 }
 
@@ -73,6 +91,13 @@ export interface ErrorResult {
 }
 
 export type LavalinkResponse = TrackResult | PlaylistResult | SearchResult | EmptyResult | ErrorResult;
+
+export interface SearchResponse {
+	tracks: Track[];
+	albums: Playlist[];
+	artists: Playlist[];
+	playlists: Playlist[];
+}
 
 export interface Address {
 	address: string;
@@ -194,6 +219,20 @@ export class Rest {
 
 	protected get sessionId(): string {
 		return this.node.sessionId!;
+	}
+
+	/**
+	 * Search for a track/album/artist/playlist
+	 * @param query The query to search for
+	 * @param types The types to search for (track, album, artist, playlist)
+	 * @returns A promise that resolves to a Lavalink response
+	 */
+	public search(query: string, types: string[]): Promise<SearchResponse | undefined> {
+		const options = {
+			endpoint: '/loadsearch',
+			options: { params: { query, types: types.join(',') }}
+		};
+		return this.fetch(options);
 	}
 
 	/**
@@ -388,6 +427,17 @@ export class Rest {
 			const response = await request
 				.json()
 				.catch(() => null) as LavalinkRestError | null;
+
+			if (
+				response?.status === 404 &&
+				response.error === 'Not Found' &&
+				response.message === 'Session not found'
+			) {
+				if (this.node.state === State.CONNECTED) {
+					this.node.disconnect(1011, 'Session not found');
+				}
+			}
+
 			throw new RestError(response ?? {
 				timestamp: Date.now(),
 				status: request.status,
